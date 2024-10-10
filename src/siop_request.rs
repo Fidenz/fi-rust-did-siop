@@ -1,6 +1,6 @@
 use crate::{
     http_request::send_request,
-    identity::{did::DidResolver, DidVerificationKey, Identity},
+    identity::{did::DidResolver, DidKey, Identity},
     jwt::{SigningInfo, JWT},
     rp::RPInfo,
     siop::{get_metadata_supported, SiopMetadataSupported},
@@ -83,11 +83,11 @@ impl DidSiopRequest {
         request: String,
         op_metadata: SiopMetadataSupported,
     ) -> Result<String, Error> {
-        if !request.starts_with("opwnid://") {
+        if !request.starts_with("openid://") {
             return Err(Error::new("Invalid request url"));
         }
 
-        let obj_str = &request["opwnid://".len()..];
+        let obj_str = &request["openid://".len()..];
 
         let query: Value = match serde_qs::from_str(obj_str) {
             Ok(val) => val,
@@ -209,7 +209,7 @@ impl DidSiopRequest {
 
         let did = payload["iss"].as_str().unwrap();
 
-        let mut public_key_info: Option<DidVerificationKey> = None;
+        let mut public_key_info: Option<DidKey> = None;
 
         let mut identity = Identity::new();
         if resolvers.is_some() {
@@ -234,6 +234,8 @@ impl DidSiopRequest {
         if public_key_info.is_some() {
             if !payload["jwks"].is_null() {}
         }
+
+        // internal keys
 
         // validate jwt claims
 

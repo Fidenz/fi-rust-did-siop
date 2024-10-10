@@ -7,6 +7,7 @@ edition = "2021"
 async-trait = "0.1.83"
 base64-compat = "1.0.0"
 bs58 = "0.5.1"
+chrono = "0.4.38"
 ethers = "2.0.14"
 fi-common = "0.1.1"
 fi-digital-signatures = "0.0.5"
@@ -21,6 +22,10 @@ secp256k1 = "0.29.1"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 serde_qs = "0.13.0"
+sha256 = "1.5.0"
 ssi = { version = "0.7.0", features = ["http-did"] }
 tokio = "1.40.0" 
 wasm-bindgen = "0.2.94"
+
+[features]
+wasm = []

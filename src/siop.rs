@@ -1,4 +1,43 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::jwt::JWT;
+
+pub struct SIOPTokensEcoded {
+    id_token: String, // Base64 encoded JWT
+    vp_token: String, // Base64 encoded JWT
+}
+
+impl SIOPTokensEcoded {
+    pub fn new(id_token: String, vp_token: String) -> SIOPTokensEcoded {
+        SIOPTokensEcoded { id_token, vp_token }
+    }
+
+    pub fn get_id_token(&self) -> &String {
+        &self.id_token
+    }
+    pub fn get_vp_token(&self) -> &String {
+        &self.vp_token
+    }
+}
+
+pub struct SIOPTokenObjects {
+    id_token: JWT, // Decoded Object
+    vp_token: JWT, // Decoded Object
+}
+
+impl SIOPTokenObjects {
+    pub fn new(id_token: JWT, vp_token: JWT) -> SIOPTokenObjects {
+        SIOPTokenObjects { id_token, vp_token }
+    }
+
+    pub fn get_id_token(&self) -> &JWT {
+        &self.id_token
+    }
+    pub fn get_vp_token(&self) -> &JWT {
+        &self.vp_token
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct SiopMetadataSupported {

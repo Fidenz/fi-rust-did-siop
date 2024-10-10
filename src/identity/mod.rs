@@ -20,15 +20,15 @@ pub fn get_resolvers() -> Vec<Box<dyn DidResolver>> {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct DidVerificationKey {
+pub struct DidKey {
     pub id: String,
     pub alg: Algorithm,
     pub public_key: (Option<Vec<u8>>, Option<String>),
 }
 
 pub struct Identity {
-    doc: Option<DidDocument>,
-    key_set: Vec<DidVerificationKey>,
+    pub doc: Option<DidDocument>,
+    key_set: Vec<DidKey>,
     resolvers: Vec<Box<dyn DidResolver>>,
 }
 
@@ -65,7 +65,7 @@ impl Identity {
     pub fn extract_authentication_keys(
         &mut self,
         algorithm: Algorithm,
-    ) -> Result<&Vec<DidVerificationKey>, Error> {
+    ) -> Result<&Vec<DidKey>, Error> {
         if self.doc.is_some() {
             let doc = self.doc.as_ref().unwrap();
             if doc.verification_method.is_some() {
@@ -79,7 +79,7 @@ impl Identity {
                         }
                     };
 
-                    self.key_set.push(DidVerificationKey {
+                    self.key_set.push(DidKey {
                         alg: match verification_method._type.as_str() {
                             "Ed25519VerificationKey2018" => Algorithm::EdDSA,
                             "EcdsaSecp256k1VerificationKey2019" => Algorithm::ES256K,

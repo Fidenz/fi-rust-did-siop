@@ -6,3 +6,4 @@ mod rp;
 mod siop;
 mod siop_request;
 mod siop_response;
+mod vp;
