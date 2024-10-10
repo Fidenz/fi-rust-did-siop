@@ -1,0 +1,26 @@
+[package]
+name = "fi-did-siop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.83"
+base64-compat = "1.0.0"
+bs58 = "0.5.1"
+ethers = "2.0.14"
+fi-common = "0.1.1"
+fi-digital-signatures = "0.0.5"
+fi-ethr-resolver = "0.0.4"
+fi-key-resolver = "0.0.4" 
+hex = "0.4.3"
+json_value_merge = "2.0.0"
+multibase = "0.9.1"
+regex = "1.11.0"
+reqwest = "0.12.8"
+secp256k1 = "0.29.1"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+serde_qs = "0.13.0"
+ssi = { version = "0.7.0", features = ["http-did"] }
+tokio = "1.40.0" 
+wasm-bindgen = "0.2.94"
