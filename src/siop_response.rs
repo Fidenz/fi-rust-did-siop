@@ -7,6 +7,7 @@ use fi_digital_signatures::{
     algorithms::Algorithm,
     jwt::{Header, Payload},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
@@ -16,14 +17,15 @@ use crate::{
     vp::VPData,
 };
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CheckParams {
-    redirect_uri: String,
-    nonce: Option<String>,
-    valid_before: Option<i64>,
-    is_expirable: bool,
+    pub redirect_uri: String,
+    pub nonce: Option<String>,
+    pub valid_before: Option<i64>,
+    pub is_expirable: bool,
 }
 
-struct DidSiopResponse {}
+pub struct DidSiopResponse {}
 
 impl DidSiopResponse {
     pub fn generate_response(

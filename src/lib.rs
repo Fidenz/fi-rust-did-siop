@@ -1,9 +1,9 @@
 pub mod http_request;
-mod identity;
-mod jwt;
+pub mod identity;
+pub mod jwt;
 mod key_extractors;
-mod rp;
-mod siop;
-mod siop_request;
-mod siop_response;
-mod vp;
+pub mod rp;
+pub mod siop;
+pub mod siop_request;
+pub mod siop_response;
+pub mod vp;

@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::identity::DidKey;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SigningInfo {
     pub alg: Algorithm,
     pub kid: String,
@@ -64,141 +64,9 @@ impl FromStr for JWT {
 
 impl JWT {
     pub fn sign(&mut self, signing_info: &SigningInfo) -> Result<(), Error> {
-        let signing_key: Box<dyn SignFromKey> = match signing_info.alg {
-            Algorithm::RS256
-            | Algorithm::RS384
-            | Algorithm::RS512
-            | Algorithm::PS256
-            | Algorithm::PS384
-            | Algorithm::PS512 => {
-                if signing_info.key.0.is_some() {
-                    match fi_digital_signatures::crypto::rsa::RsaSigningKey::from_bytes(
-                        signing_info.key.0.as_ref().unwrap().as_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.key.1.is_some() {
-                    match fi_digital_signatures::crypto::rsa::RsaSigningKey::from_pem(
-                        signing_info.key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::EdDSA => {
-                if signing_info.key.0.is_some() {
-                    match fi_digital_signatures::crypto::eddsa::EDDSASigningKey::from_bytes(
-                        signing_info.key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.key.1.is_some() {
-                    match fi_digital_signatures::crypto::eddsa::EDDSASigningKey::from_pem(
-                        signing_info.key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES256 => {
-                if signing_info.key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256::P256SigningKey::from_bytes(
-                        signing_info.key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256::P256SigningKey::from_pem(
-                        signing_info.key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES384 => {
-                if signing_info.key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_384::P384SigningKey::from_bytes(
-                        signing_info.key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_384::P384SigningKey::from_pem(
-                        signing_info.key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES512 => {
-                if signing_info.key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_512::P512SigningKey::from_bytes(
-                        signing_info.key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_512::P512SigningKey::from_pem(
-                        signing_info.key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES256K => {
-                if signing_info.key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256k::P256kSigningKey::from_bytes(
-                        signing_info.key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256k::P256kSigningKey::from_pem(
-                        signing_info.key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
-                if signing_info.key.0.is_some() {
-                    Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
-                        String::from(String::from_utf8_lossy(
-                            &signing_info.key.0.clone().unwrap(),
-                        )),
-                    ))
-                } else if signing_info.key.1.is_some() {
-                    Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
-                        signing_info.key.1.clone().unwrap(),
-                    ))
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
+        let signing_key = match get_signing_key(signing_info) {
+            Ok(val) => val,
+            Err(error) => return Err(error),
         };
 
         match signing_key.sign(
@@ -219,141 +87,9 @@ impl JWT {
         signature: String,
         signing_info: &mut DidKey,
     ) -> Result<bool, Error> {
-        let verifying_key: Box<dyn VerifyFromKey> = match signing_info.alg {
-            Algorithm::RS256
-            | Algorithm::RS384
-            | Algorithm::RS512
-            | Algorithm::PS256
-            | Algorithm::PS384
-            | Algorithm::PS512 => {
-                if signing_info.public_key.0.is_some() {
-                    match fi_digital_signatures::crypto::rsa::RsaVerifyingKey::from_bytes(
-                        signing_info.public_key.0.as_ref().unwrap().as_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.public_key.1.is_some() {
-                    match fi_digital_signatures::crypto::rsa::RsaVerifyingKey::from_pem(
-                        signing_info.public_key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::EdDSA => {
-                if signing_info.public_key.0.is_some() {
-                    match fi_digital_signatures::crypto::eddsa::EDDSAVerifyingKey::from_bytes(
-                        signing_info.public_key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.public_key.1.is_some() {
-                    match fi_digital_signatures::crypto::eddsa::EDDSAVerifyingKey::from_pem(
-                        signing_info.public_key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES256 => {
-                if signing_info.public_key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256::P256VerifyingKey::from_bytes(
-                        signing_info.public_key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.public_key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256::P256VerifyingKey::from_pem(
-                        signing_info.public_key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES384 => {
-                if signing_info.public_key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_384::P384VerifyingKey::from_bytes(
-                        signing_info.public_key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.public_key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_384::P384VerifyingKey::from_pem(
-                        signing_info.public_key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES512 => {
-                if signing_info.public_key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_512::P512VerifyingKey::from_bytes(
-                        signing_info.public_key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.public_key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_512::P512VerifyingKey::from_pem(
-                        signing_info.public_key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::ES256K => {
-                if signing_info.public_key.0.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256k::P256kVerifyingKey::from_bytes(
-                        signing_info.public_key.0.clone().unwrap().as_mut_slice(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else if signing_info.public_key.1.is_some() {
-                    match fi_digital_signatures::crypto::ecdsa::_256k::P256kVerifyingKey::from_pem(
-                        signing_info.public_key.1.as_ref().unwrap().as_str(),
-                    ) {
-                        Ok(val) => Box::new(val),
-                        Err(error) => return Err(Error::new(error.to_string().as_str())),
-                    }
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
-            Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
-                if signing_info.public_key.0.is_some() {
-                    Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
-                        String::from(String::from_utf8_lossy(
-                            &signing_info.public_key.0.clone().unwrap(),
-                        )),
-                    ))
-                } else if signing_info.public_key.1.is_some() {
-                    Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
-                        signing_info.public_key.1.clone().unwrap(),
-                    ))
-                } else {
-                    return Err(Error::new("public key content unknown"));
-                }
-            }
+        let verifying_key = match get_verifying_key(signing_info) {
+            Ok(val) => val,
+            Err(error) => return Err(error),
         };
 
         match verifying_key.verify(content, signature, signing_info.alg) {
@@ -361,4 +97,286 @@ impl JWT {
             Err(error) => Err(Error::new(error.to_string().as_str())),
         }
     }
+}
+
+pub fn get_signing_key(signing_info: &SigningInfo) -> Result<Box<dyn SignFromKey>, Error> {
+    let signing_key: Box<dyn SignFromKey> = match signing_info.alg {
+        Algorithm::RS256
+        | Algorithm::RS384
+        | Algorithm::RS512
+        | Algorithm::PS256
+        | Algorithm::PS384
+        | Algorithm::PS512 => {
+            if signing_info.key.0.is_some() {
+                match fi_digital_signatures::crypto::rsa::RsaSigningKey::from_bytes(
+                    signing_info.key.0.as_ref().unwrap().as_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.key.1.is_some() {
+                match fi_digital_signatures::crypto::rsa::RsaSigningKey::from_pem(
+                    signing_info.key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::EdDSA => {
+            if signing_info.key.0.is_some() {
+                match fi_digital_signatures::crypto::eddsa::EDDSASigningKey::from_bytes(
+                    signing_info.key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.key.1.is_some() {
+                match fi_digital_signatures::crypto::eddsa::EDDSASigningKey::from_pem(
+                    signing_info.key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES256 => {
+            if signing_info.key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256::P256SigningKey::from_bytes(
+                    signing_info.key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256::P256SigningKey::from_pem(
+                    signing_info.key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES384 => {
+            if signing_info.key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_384::P384SigningKey::from_bytes(
+                    signing_info.key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_384::P384SigningKey::from_pem(
+                    signing_info.key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES512 => {
+            if signing_info.key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_512::P512SigningKey::from_bytes(
+                    signing_info.key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_512::P512SigningKey::from_pem(
+                    signing_info.key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES256K => {
+            if signing_info.key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256k::P256kSigningKey::from_bytes(
+                    signing_info.key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256k::P256kSigningKey::from_pem(
+                    signing_info.key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+            if signing_info.key.0.is_some() {
+                Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
+                    String::from(String::from_utf8_lossy(
+                        &signing_info.key.0.clone().unwrap(),
+                    )),
+                ))
+            } else if signing_info.key.1.is_some() {
+                Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
+                    signing_info.key.1.clone().unwrap(),
+                ))
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+    };
+
+    Ok(signing_key)
+}
+
+pub fn get_verifying_key(signing_info: &mut DidKey) -> Result<Box<dyn VerifyFromKey>, Error> {
+    let verifying_key: Box<dyn VerifyFromKey> = match signing_info.alg {
+        Algorithm::RS256
+        | Algorithm::RS384
+        | Algorithm::RS512
+        | Algorithm::PS256
+        | Algorithm::PS384
+        | Algorithm::PS512 => {
+            if signing_info.public_key.0.is_some() {
+                match fi_digital_signatures::crypto::rsa::RsaVerifyingKey::from_bytes(
+                    signing_info.public_key.0.as_ref().unwrap().as_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.public_key.1.is_some() {
+                match fi_digital_signatures::crypto::rsa::RsaVerifyingKey::from_pem(
+                    signing_info.public_key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::EdDSA => {
+            if signing_info.public_key.0.is_some() {
+                match fi_digital_signatures::crypto::eddsa::EDDSAVerifyingKey::from_bytes(
+                    signing_info.public_key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.public_key.1.is_some() {
+                match fi_digital_signatures::crypto::eddsa::EDDSAVerifyingKey::from_pem(
+                    signing_info.public_key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES256 => {
+            if signing_info.public_key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256::P256VerifyingKey::from_bytes(
+                    signing_info.public_key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.public_key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256::P256VerifyingKey::from_pem(
+                    signing_info.public_key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES384 => {
+            if signing_info.public_key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_384::P384VerifyingKey::from_bytes(
+                    signing_info.public_key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.public_key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_384::P384VerifyingKey::from_pem(
+                    signing_info.public_key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES512 => {
+            if signing_info.public_key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_512::P512VerifyingKey::from_bytes(
+                    signing_info.public_key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.public_key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_512::P512VerifyingKey::from_pem(
+                    signing_info.public_key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::ES256K => {
+            if signing_info.public_key.0.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256k::P256kVerifyingKey::from_bytes(
+                    signing_info.public_key.0.clone().unwrap().as_mut_slice(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else if signing_info.public_key.1.is_some() {
+                match fi_digital_signatures::crypto::ecdsa::_256k::P256kVerifyingKey::from_pem(
+                    signing_info.public_key.1.as_ref().unwrap().as_str(),
+                ) {
+                    Ok(val) => Box::new(val),
+                    Err(error) => return Err(Error::new(error.to_string().as_str())),
+                }
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+        Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+            if signing_info.public_key.0.is_some() {
+                Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
+                    String::from(String::from_utf8_lossy(
+                        &signing_info.public_key.0.clone().unwrap(),
+                    )),
+                ))
+            } else if signing_info.public_key.1.is_some() {
+                Box::new(fi_digital_signatures::crypto::hmac::HMACKey::new(
+                    signing_info.public_key.1.clone().unwrap(),
+                ))
+            } else {
+                return Err(Error::new("public key content unknown"));
+            }
+        }
+    };
+
+    Ok(verifying_key)
 }

@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 const REQUIRED_SCOPES: [&str; 1] = ["openid"];
 
-struct DidSiopRequest {}
+pub struct DidSiopRequest {}
 
 impl DidSiopRequest {
     pub async fn validate_request(
@@ -29,8 +29,8 @@ impl DidSiopRequest {
     }
 
     pub async fn generate_request(
-        rp: RPInfo,
-        signing_info: SigningInfo,
+        rp: &RPInfo,
+        signing_info: &SigningInfo,
         options: Value,
     ) -> Result<String, Error> {
         let url = "openid://";
@@ -40,11 +40,11 @@ impl DidSiopRequest {
             "scope": "openid"});
 
         if rp.request_uri.is_some() {
-            query["request_uri"] = Value::from(rp.request_uri.unwrap());
+            query["request_uri"] = Value::from(rp.request_uri.clone().unwrap());
         } else {
             let header = Header {
                 alg: signing_info.alg,
-                kid: signing_info.kid,
+                kid: signing_info.kid.clone(),
                 typ: String::from("JWT"),
             };
 
