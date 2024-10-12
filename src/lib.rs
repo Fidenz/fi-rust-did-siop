@@ -2,6 +2,7 @@ pub mod http_request;
 pub mod identity;
 pub mod jwt;
 mod key_extractors;
+pub mod provider;
 pub mod rp;
 pub mod siop;
 pub mod siop_request;

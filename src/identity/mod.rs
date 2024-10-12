@@ -101,4 +101,22 @@ impl Identity {
 
         Ok(&self.key_set)
     }
+
+    pub fn get_document(&self) -> Option<DidDocument> {
+        self.doc.clone()
+    }
+
+    pub fn get_document_ref(&self) -> &Option<DidDocument> {
+        &self.doc
+    }
+
+    pub fn set_document(&mut self, doc: DidDocument, did: String) {
+        if doc.id == did && doc.authentication.as_ref().is_some_and(|a| a.len() > 0) {
+            self.doc = Some(doc);
+        }
+    }
+
+    pub fn is_resolved(&self) -> bool {
+        return self.doc.is_some();
+    }
 }
