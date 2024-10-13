@@ -57,8 +57,15 @@ impl Identity {
         self.resolvers.as_mut()
     }
 
+    #[cfg(not(feature = "wasm"))]
     pub async fn resolve(&mut self, did: String) {
         let doc = get_did_doc(did, &self.resolvers).await;
+        self.doc = doc;
+    }
+
+    #[cfg(feature = "wasm")]
+    pub fn resolve(&mut self, did: String) {
+        let doc = get_did_doc(did, &self.resolvers);
         self.doc = doc;
     }
 

@@ -6,9 +6,11 @@ use fi_digital_signatures::{
     crypto::{SignFromKey, VerifyFromKey},
     jwt::{Header, Payload},
 };
-use reqwest::header;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use wasm_bindgen::prelude::wasm_bindgen;
+#[cfg(feature = "wasm")]
+use wasm_bindgen::JsValue;
 
 use crate::identity::DidKey;
 
@@ -20,10 +22,60 @@ pub struct SigningInfo {
 }
 
 #[derive(Serialize, Deserialize)]
+#[wasm_bindgen]
 pub struct JWT {
+    #[wasm_bindgen(skip)]
     pub header: Header,
+    #[wasm_bindgen(skip)]
     pub payload: Payload,
+    #[wasm_bindgen(skip)]
     pub signature: Option<String>,
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl JWT {
+    #[wasm_bindgen(getter = header)]
+    pub fn header(&self) -> JsValue {
+        match serde_wasm_bindgen::to_value(&self.header) {
+            Ok(val) => val,
+            Err(error) => JsValue::NULL,
+        }
+    }
+
+    #[wasm_bindgen(setter = header)]
+    pub fn set_header(&mut self, header: JsValue) {
+        match serde_wasm_bindgen::from_value(header) {
+            Ok(val) => self.header = val,
+            Err(error) => {}
+        };
+    }
+
+    #[wasm_bindgen(getter = payload)]
+    pub fn payload(&self) -> JsValue {
+        match serde_wasm_bindgen::to_value(&self.payload) {
+            Ok(val) => val,
+            Err(error) => JsValue::NULL,
+        }
+    }
+
+    #[wasm_bindgen(setter = payload)]
+    pub fn set_payload(&mut self, payload: JsValue) {
+        match serde_wasm_bindgen::from_value(payload) {
+            Ok(val) => self.payload = Payload(val),
+            Err(error) => self.payload = Payload(Value::Null),
+        };
+    }
+
+    #[wasm_bindgen(getter = signature)]
+    pub fn signature(&self) -> Option<String> {
+        self.signature.clone()
+    }
+
+    #[wasm_bindgen(setter = signature)]
+    pub fn set_signature(&mut self, signature: Option<String>) {
+        self.signature = signature;
+    }
 }
 
 impl FromStr for JWT {

@@ -1,5 +1,4 @@
-use core::error;
-use std::{ops::Deref, str::FromStr};
+use std::str::FromStr;
 
 use chrono::{TimeZone, Timelike, Utc};
 use fi_common::error::Error;
@@ -9,6 +8,8 @@ use fi_digital_signatures::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::Digest;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     identity::{did::DidResolver, Identity},
@@ -18,13 +19,39 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize, Clone)]
+#[wasm_bindgen]
 pub struct CheckParams {
+    #[wasm_bindgen(skip)]
     pub redirect_uri: String,
+    #[wasm_bindgen(skip)]
     pub nonce: Option<String>,
     pub valid_before: Option<i64>,
     pub is_expirable: bool,
 }
 
+#[wasm_bindgen]
+impl CheckParams {
+    #[wasm_bindgen(getter = redirect_uri)]
+    pub fn redirect_uri(&self) -> String {
+        self.redirect_uri.clone()
+    }
+
+    #[wasm_bindgen(setter = redirect_uri)]
+    pub fn set_redirect_uri(&mut self, redirect_uri: String) {
+        self.redirect_uri = redirect_uri;
+    }
+    #[wasm_bindgen(getter = nonce)]
+    pub fn nonce(&self) -> Option<String> {
+        self.nonce.clone()
+    }
+
+    #[wasm_bindgen(setter = nonce)]
+    pub fn set_nonce(&mut self, nonce: Option<String>) {
+        self.nonce = nonce;
+    }
+}
+
+#[wasm_bindgen]
 pub struct DidSiopResponse {}
 
 impl DidSiopResponse {
@@ -76,11 +103,16 @@ impl DidSiopResponse {
 
         // add public key
 
-        payload["iat"] = match serde_json::to_value(chrono::Utc::now()) {
+        payload["iat"] = match serde_json::to_value(chrono::Utc::now().timestamp_millis()) {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
         };
-        payload["exp"] = match serde_json::to_value(chrono::Utc::now().with_second(expires_in)) {
+        payload["exp"] = match serde_json::to_value(
+            chrono::Utc::now()
+                .with_second(expires_in)
+                .unwrap()
+                .timestamp_millis(),
+        ) {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
         };
@@ -288,7 +320,7 @@ impl DidSiopResponse {
                             }
                         }
                         chrono::offset::LocalResult::None => {}
-                        chrono::offset::LocalResult::Ambiguous(val, e) => {
+                        chrono::offset::LocalResult::Ambiguous(val, _) => {
                             if val < Utc::now() {
                                 return Err(Error::new("Expired"));
                             }
@@ -364,8 +396,14 @@ impl DidSiopResponse {
 }
 
 fn calculate_thumbprint(sub_jwk: Value) -> Result<String, Error> {
-    Ok(sha256::digest(match serde_json::to_string(&sub_jwk) {
+    let mut sha = sha2::Sha256::new();
+    sha.update(match serde_json::to_string(&sub_jwk) {
         Ok(val) => val,
         Err(error) => return Err(Error::new(error.to_string().as_str())),
-    }))
+    });
+
+    match String::from_utf8(sha.finalize().to_vec()) {
+        Ok(val) => Ok(val),
+        Err(error) => return Err(Error::new(error.to_string().as_str())),
+    }
 }

@@ -4,17 +4,21 @@ use crate::{
     siop_response::DidSiopResponse,
     vp::VPData,
 };
-use ethers::core::rand::{seq::SliceRandom, thread_rng};
 use fi_common::{did::DidDocument, error::Error, keys::KeyPair, logger};
+use rand::Rng;
 use serde_json::Value;
+use wasm_bindgen::prelude::wasm_bindgen;
+#[cfg(feature = "wasm")]
+use wasm_bindgen::JsValue;
 
+#[wasm_bindgen]
 pub struct Provider {
     identity: Identity,
     signing_info_set: Vec<SigningInfo>,
-    resolvers: Vec<Box<dyn DidResolver>>,
 }
 
 impl Provider {
+    #[cfg(not(feature = "wasm"))]
     pub async fn get_provider(
         did: String,
         doc: Option<DidDocument>,
@@ -22,7 +26,6 @@ impl Provider {
     ) -> Provider {
         let mut provider = Provider {
             identity: Identity::new(),
-            resolvers: Vec::new(),
             signing_info_set: Vec::new(),
         };
 
@@ -31,6 +34,7 @@ impl Provider {
         provider
     }
 
+    #[cfg(not(feature = "wasm"))]
     async fn set_user(
         &mut self,
         did: String,
@@ -48,6 +52,99 @@ impl Provider {
         }
     }
 
+    #[cfg(not(feature = "wasm"))]
+    pub async fn generate_response(
+        &mut self,
+        request_payload: Value,
+        expires_in: u32,
+    ) -> Result<String, Error> {
+        if self.signing_info_set.len() > 0 {
+            let num = rand::thread_rng().gen_range(0..self.signing_info_set.len());
+            let signing_info = &self.signing_info_set[num];
+
+            if self.identity.is_resolved() {
+                return DidSiopResponse::generate_response(
+                    request_payload,
+                    signing_info,
+                    &mut self.identity,
+                    expires_in,
+                    None,
+                );
+            }
+
+            return Err(Error::new("Unresolved did document"));
+        } else {
+            return Err(Error::new("No signing info instance found"));
+        }
+    }
+
+    #[cfg(not(feature = "wasm"))]
+    pub async fn generate_response_with_vpdata(
+        &mut self,
+        request_payload: Value,
+        expires_in: u32,
+        vps: VPData,
+    ) -> Result<String, Error> {
+        if self.signing_info_set.len() > 0 {
+            let num = rand::thread_rng().gen_range(0..self.signing_info_set.len());
+            let signing_info = &self.signing_info_set[num];
+
+            if self.identity.is_resolved() {
+                return DidSiopResponse::generate_response(
+                    request_payload,
+                    signing_info,
+                    &mut self.identity,
+                    expires_in,
+                    Some(vps),
+                );
+            }
+
+            return Err(Error::new("Unresolved did document"));
+        } else {
+            return Err(Error::new("No signing info instance found"));
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl Provider {
+    #[wasm_bindgen(method, js_name = "setUser")]
+    #[cfg(feature = "wasm")]
+    pub fn set_user(&mut self, did: String, doc: Option<DidDocument>) {
+        use crate::identity::get_resolvers;
+
+        if doc.is_some() {
+            self.identity.set_document(doc.unwrap(), did);
+        } else {
+            self.identity.add_resolvers(get_resolvers());
+
+            self.identity.resolve(did);
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    #[wasm_bindgen(method, js_name = "getProvider")]
+    pub fn get_provider(did: String, doc: Option<DidDocument>) -> Provider {
+        let mut provider = Provider {
+            identity: Identity::new(),
+            signing_info_set: Vec::new(),
+        };
+        provider.set_user(did, doc);
+        provider
+    }
+
+    #[wasm_bindgen(method, js_name = "removeSigningParams")]
+    pub fn remove_signing_params(&mut self, kid: String) {
+        let filtered: Vec<SigningInfo> = self
+            .signing_info_set
+            .clone()
+            .into_iter()
+            .filter(|x| x.kid.ne(&kid))
+            .collect();
+        self.signing_info_set = filtered;
+    }
+
+    #[wasm_bindgen(method, js_name = "addSigningParams")]
     pub fn add_signing_params(&mut self, key: KeyPair) -> Result<String, Error> {
         let mut keys = match self
             .identity
@@ -114,36 +211,28 @@ impl Provider {
         return Err(Error::new("No public key found"));
     }
 
-    pub fn remove_signing_params(&mut self, kid: String) {
-        let filtered: Vec<SigningInfo> = self
-            .signing_info_set
-            .clone()
-            .into_iter()
-            .filter(|x| x.kid.ne(&kid))
-            .collect();
-        self.signing_info_set = filtered;
-    }
-
-    pub fn remove_resolvers(&mut self) {
-        self.resolvers.clear();
-    }
-
-    pub async fn generate_response(
+    #[cfg(feature = "wasm")]
+    #[wasm_bindgen(method, js_name = "generateResponseWithVPData")]
+    pub fn generate_response_with_vpdata(
         &mut self,
-        request_payload: Value,
+        request_payload: JsValue,
         expires_in: u32,
+        vps: VPData,
     ) -> Result<String, Error> {
         if self.signing_info_set.len() > 0 {
-            let mut rng = thread_rng();
-            let signing_info = self.signing_info_set.choose(&mut rng).unwrap();
+            let num = rand::thread_rng().gen_range(0..self.signing_info_set.len());
+            let signing_info = &self.signing_info_set[num];
 
             if self.identity.is_resolved() {
                 return DidSiopResponse::generate_response(
-                    request_payload,
+                    match serde_wasm_bindgen::from_value(request_payload) {
+                        Ok(val) => val,
+                        Err(error) => return Err(Error::new(error.to_string().as_str())),
+                    },
                     signing_info,
                     &mut self.identity,
                     expires_in,
-                    None,
+                    Some(vps),
                 );
             }
 
@@ -153,23 +242,27 @@ impl Provider {
         }
     }
 
-    pub async fn generate_response_with_vpdata(
+    #[cfg(feature = "wasm")]
+    #[wasm_bindgen(method, js_name = "generateResponse")]
+    pub async fn generate_response(
         &mut self,
-        request_payload: Value,
+        request_payload: JsValue,
         expires_in: u32,
-        vps: VPData,
     ) -> Result<String, Error> {
         if self.signing_info_set.len() > 0 {
-            let mut rng = thread_rng();
-            let signing_info = self.signing_info_set.choose(&mut rng).unwrap();
+            let num = rand::thread_rng().gen_range(0..self.signing_info_set.len());
+            let signing_info = &self.signing_info_set[num];
 
             if self.identity.is_resolved() {
                 return DidSiopResponse::generate_response(
-                    request_payload,
+                    match serde_wasm_bindgen::from_value(request_payload) {
+                        Ok(val) => val,
+                        Err(error) => return Err(Error::new(error.to_string().as_str())),
+                    },
                     signing_info,
                     &mut self.identity,
                     expires_in,
-                    Some(vps),
+                    None,
                 );
             }
 

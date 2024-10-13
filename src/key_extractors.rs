@@ -1,6 +1,6 @@
 use base64::{decode_config, URL_SAFE_NO_PAD};
-use ethers::utils::keccak256;
 use fi_common::{error::Error, keys::KeyPair};
+use keccak_hash::keccak256;
 use regex::Regex;
 use serde_json::Value;
 
@@ -198,7 +198,10 @@ fn to_checksum_address(address: String, chain_id: Option<String>) -> Result<Stri
         None => String::from(""),
     };
 
-    let keccak_hash = hex::encode(keccak256(format!("{}{}", prefix, strip_address).as_bytes()));
+    let mut data_content = format!("{}{}", prefix, strip_address);
+    let mut data = unsafe { data_content.as_bytes_mut() };
+    keccak256(&mut data);
+    let keccak_hash = hex::encode(data);
     let mut checksum_address = String::from("0x");
     for i in 0..strip_address.len() {
         checksum_address = format!(

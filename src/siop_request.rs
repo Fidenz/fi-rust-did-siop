@@ -10,22 +10,48 @@ use fi_digital_signatures::jwt::{Header, Payload};
 use json_value_merge::Merge;
 use reqwest::Method;
 use serde_json::{json, Value};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 const REQUIRED_SCOPES: [&str; 1] = ["openid"];
 
+#[wasm_bindgen]
 pub struct DidSiopRequest {}
 
 impl DidSiopRequest {
+    #[cfg(not(feature = "wasm"))]
     pub async fn validate_request(
         request: String,
         mut op_metadata: Option<SiopMetadataSupported>,
-        resolvers: Option<Box<dyn DidResolver>>,
+        resolvers: Option<Vec<Box<dyn DidResolver>>>,
     ) -> Result<JWT, Error> {
         if op_metadata.is_none() {
             op_metadata = Some(get_metadata_supported())
         }
 
-        todo!()
+        let request_jwt =
+            match DidSiopRequest::validate_request_params(request, op_metadata.unwrap()).await {
+                Ok(val) => val,
+                Err(error) => return Err(error),
+            };
+        DidSiopRequest::validate_request_jwt(request_jwt, resolvers).await
+    }
+
+    #[cfg(feature = "wasm")]
+    pub async fn validate_request(
+        request: String,
+        mut op_metadata: Option<SiopMetadataSupported>,
+        resolvers: Option<Vec<Box<dyn DidResolver>>>,
+    ) -> Result<JWT, Error> {
+        if op_metadata.is_none() {
+            op_metadata = Some(get_metadata_supported())
+        }
+
+        let request_jwt =
+            match DidSiopRequest::validate_request_params(request, op_metadata.unwrap()).await {
+                Ok(val) => val,
+                Err(error) => return Err(error),
+            };
+        DidSiopRequest::validate_request_jwt(request_jwt, resolvers)
     }
 
     pub async fn generate_request(
@@ -121,7 +147,7 @@ impl DidSiopRequest {
 
             if !requested_scopes.iter().all(|s| {
                 op_metadata
-                    .scopes
+                    .scopes()
                     .as_ref()
                     .is_some_and(|op| op.contains(&String::from(*s)))
             }) || !REQUIRED_SCOPES.iter().all(|s| requested_scopes.contains(s))
@@ -132,9 +158,9 @@ impl DidSiopRequest {
             return Err(Error::new("Invalid request fields: scope"));
         }
 
-        if op_metadata.response_types.is_some() {
+        if op_metadata.response_types().is_some() {
             if !op_metadata
-                .response_types
+                .response_types()
                 .unwrap()
                 .contains(&String::from(response_type))
             {
@@ -168,6 +194,7 @@ impl DidSiopRequest {
         todo!()
     }
 
+    #[cfg(not(feature = "wasm"))]
     pub async fn validate_request_jwt(
         jwt: String,
         resolvers: Option<Vec<Box<dyn DidResolver>>>,
@@ -216,6 +243,95 @@ impl DidSiopRequest {
             identity.add_resolvers(resolvers.unwrap());
         }
         identity.resolve(String::from(did)).await;
+
+        public_key_info = match identity.extract_authentication_keys(header.alg) {
+            Ok(val) => match val.iter().find(|x| x.id.eq(&header.kid)) {
+                Some(v) => Some(v.clone()),
+                None => None,
+            },
+            Err(error) => return Err(error),
+        };
+
+        if public_key_info.is_none() {
+            return Err(Error::new(
+                "No public key found in the remote did documents",
+            ));
+        }
+
+        if public_key_info.is_some() {
+            if !payload["jwks"].is_null() {}
+        }
+
+        // internal keys
+
+        // validate jwt claims
+
+        match JWT::verify(
+            format!("{}.{}", content[0], content[1]),
+            String::from(content[2]),
+            &mut public_key_info.unwrap(),
+        ) {
+            Ok(val) => match val {
+                true => Ok(JWT {
+                    header,
+                    payload: Payload(payload),
+                    signature: Some(String::from(content[2])),
+                }),
+                false => Err(Error::new("JWT verification failed")),
+            },
+            Err(error) => return Err(error),
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    pub fn validate_request_jwt(
+        jwt: String,
+        resolvers: Option<Vec<Box<dyn DidResolver>>>,
+    ) -> Result<JWT, Error> {
+        let content: Vec<&str> = jwt.split(".").collect();
+        if content.len() != 3 {
+            return Err(Error::new("Invalid JWT string"));
+        }
+
+        let header: Header = match base64::decode(content[0]) {
+            Ok(val) => match serde_json::from_slice(val.as_slice()) {
+                Ok(v) => v,
+                Err(error) => return Err(Error::new(error.to_string().as_str())),
+            },
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
+        };
+
+        let payload: Value = match base64::decode(content[1]) {
+            Ok(val) => match serde_json::from_slice(val.as_slice()) {
+                Ok(v) => v,
+                Err(error) => return Err(Error::new(error.to_string().as_str())),
+            },
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
+        };
+
+        if header.kid.contains(" ")
+            || payload["iss"].as_str().is_none()
+            || payload["scope"].is_null()
+        {
+            let scopes: Vec<String> = match serde_json::from_value(payload["scope"].clone()) {
+                Ok(val) => val,
+                Err(error) => return Err(Error::new(error.to_string().as_str())),
+            };
+
+            if !scopes.contains(&String::from("openid")) {
+                return Err(Error::new("Invalid request"));
+            }
+        }
+
+        let did = payload["iss"].as_str().unwrap();
+
+        let mut public_key_info: Option<DidKey> = None;
+
+        let mut identity = Identity::new();
+        if resolvers.is_some() {
+            identity.add_resolvers(resolvers.unwrap());
+        }
+        identity.resolve(String::from(did));
 
         public_key_info = match identity.extract_authentication_keys(header.alg) {
             Ok(val) => match val.iter().find(|x| x.id.eq(&header.kid)) {
