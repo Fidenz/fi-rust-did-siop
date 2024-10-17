@@ -21,10 +21,16 @@ pub async fn get_did_doc(
     did: String,
     resolvers: &Vec<Box<dyn DidResolver>>,
 ) -> Option<DidDocument> {
+    use fi_common::logger;
+
     for resolver in resolvers {
         match resolver.resolve(did.as_str()).await {
-            Ok(val) => return Some(val),
-            Err(error) => {}
+            Ok(val) => {
+                return Some(val);
+            }
+            Err(error) => {
+                logger::log(error.to_string().as_str());
+            }
         };
     }
 

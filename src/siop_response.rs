@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use chrono::{TimeZone, Timelike, Utc};
+use chrono::{Duration, TimeZone, Timelike, Utc};
 use fi_common::error::Error;
 use fi_digital_signatures::{
     algorithms::Algorithm,
@@ -64,11 +64,6 @@ impl DidSiopResponse {
     ) -> Result<String, fi_common::error::Error> {
         let alg = signing_info.alg;
 
-        let did_key_opt = match user.extract_authentication_keys(alg) {
-            Ok(val) => val.iter().find(|e| e.id == signing_info.kid),
-            Err(error) => return Err(error),
-        };
-
         let header = Header {
             alg,
             kid: signing_info.kid.clone(),
@@ -107,11 +102,9 @@ impl DidSiopResponse {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
         };
+
         payload["exp"] = match serde_json::to_value(
-            chrono::Utc::now()
-                .with_second(expires_in)
-                .unwrap()
-                .timestamp_millis(),
+            (chrono::Utc::now() + Duration::seconds(expires_in.into())).timestamp_millis(),
         ) {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
@@ -250,7 +243,7 @@ impl DidSiopResponse {
         ))
     }
 
-    pub fn validate_response(
+    pub async fn validate_response(
         response: String,
         check_params: CheckParams,
         resolvers: Option<Vec<Box<dyn DidResolver>>>,
@@ -278,16 +271,12 @@ impl DidSiopResponse {
 
         let iss = payload["iss"].as_str();
         let aud = payload["aud"].as_str();
-        let did = payload["did"].as_str();
-        let sub = payload["sub"].as_str();
-        let sub_jwk = payload["sub_jwk"].clone();
+        let did = payload["did"].as_object();
 
-        if header.kid.contains(" ")
+        if !header.kid.contains(" ")
             && iss.is_some_and(|e| !e.contains(" "))
             && aud.is_some_and(|e| !e.contains(" "))
-            && did.is_some_and(|e| !e.contains(" "))
-            && sub.is_some_and(|e| !e.contains(" "))
-            && serde_json::to_string(&sub_jwk).is_ok_and(|e| !e.contains(" "))
+            && did.is_some()
         {
             if iss.is_some_and(|e| e.ne("https://self-issued.me")) {
                 return Err(Error::new("Is not compatible with the SIOP flow"));
@@ -327,18 +316,32 @@ impl DidSiopResponse {
                         }
                     };
 
-                    let jwt_thumbprint = match calculate_thumbprint(sub_jwk) {
-                        Ok(val) => val,
-                        Err(error) => return Err(error),
-                    };
-                    if jwt_thumbprint.ne(&sub.unwrap()) {
-                        return Err(Error::new("Invalid jwk thumbprint"));
+                    let sub = payload["sub"].as_str();
+                    let sub_jwk = payload["sub_jwk"].clone();
+                    if sub.is_some_and(|e| !e.contains(" "))
+                        && serde_json::to_string(&sub_jwk).is_ok_and(|e| !e.contains(" "))
+                    {
+                        let jwt_thumbprint = match calculate_thumbprint(sub_jwk) {
+                            Ok(val) => val,
+                            Err(error) => return Err(error),
+                        };
+                        if jwt_thumbprint.ne(&sub.unwrap()) {
+                            return Err(Error::new("Invalid jwk thumbprint"));
+                        }
                     }
 
                     let mut identity = Identity::new();
                     if resolvers.is_some() {
                         identity.add_resolvers(resolvers.unwrap());
                     }
+
+                    #[cfg(not(feature = "wasm"))]
+                    identity
+                        .resolve(String::from(did.unwrap()["id"].as_str().unwrap()))
+                        .await;
+
+                    #[cfg(feature = "wasm")]
+                    identity.resolve(String::from(did.unwrap()["id"].as_str().unwrap()));
 
                     let mut key = match identity.extract_authentication_keys(header.alg) {
                         Ok(val) => match val.iter().find(|x| x.id.eq(&header.kid)) {
@@ -368,11 +371,13 @@ impl DidSiopResponse {
                     }
                 }
             }
+            return Err(Error::new("Expired jwt"));
+        } else {
+            return Err(Error::new("Invalid jwt content"));
         }
-        return Err(Error::new("Invalid jwt content"));
     }
 
-    pub fn validate_response_with_vpdata(
+    pub async fn validate_response_with_vpdata(
         tokens_encoded: SIOPTokensEcoded,
         check_params: CheckParams,
         resolvers: Option<Vec<Box<dyn DidResolver>>>,
@@ -381,7 +386,9 @@ impl DidSiopResponse {
             tokens_encoded.get_id_token().clone(),
             check_params,
             resolvers,
-        ) {
+        )
+        .await
+        {
             Ok(val) => val,
             Err(error) => return Err(error),
         };

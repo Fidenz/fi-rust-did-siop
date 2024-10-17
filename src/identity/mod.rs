@@ -3,7 +3,7 @@ use fi_common::{did::DidDocument, error::Error, logger};
 use fi_digital_signatures::algorithms::Algorithm;
 use serde::{Deserialize, Serialize};
 
-use crate::key_extractors::get_verifying_key;
+use crate::key_extractors::get_key;
 
 pub mod did;
 mod ethr_resolver;
@@ -78,7 +78,7 @@ impl Identity {
             if doc.verification_method.is_some() {
                 let verification_methods = doc.verification_method.as_ref().unwrap();
                 verification_methods.iter().for_each(|verification_method| {
-                    let key = match get_verifying_key(verification_method.clone()) {
+                    let key = match get_key(verification_method.clone()) {
                         Ok(val) => val,
                         Err(error) => {
                             logger::error(error.to_string().as_str());
@@ -90,14 +90,13 @@ impl Identity {
                         alg: match verification_method._type.as_str() {
                             "Ed25519VerificationKey2018" => Algorithm::EdDSA,
                             "EcdsaSecp256k1VerificationKey2019" => Algorithm::ES256K,
+                            "EcdsaSecp256k1RecoveryMethod2020" => Algorithm::ES256K,
                             "RsaVerificationKey2018" => Algorithm::RS256,
                             "X25519KeyAgreementKey2019" => Algorithm::EdDSA,
                             _ => algorithm,
                         },
-                        id: match verification_method.controller.as_ref() {
-                            Some(val) => {
-                                String::from(val.clone().split("#").collect::<Vec<&str>>()[0])
-                            }
+                        id: match verification_method.id.clone() {
+                            Some(val) => String::from(val),
                             None => self.doc.as_ref().unwrap().id.clone(),
                         },
                         public_key: key,

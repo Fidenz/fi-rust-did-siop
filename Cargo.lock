@@ -1166,9 +1166,9 @@ dependencies = [
 
 [[package]]
 name = "fi-common"
-version = "0.1.1"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbdad9530e0bbbbe393dea32f0221f842c3ef7f293a7d1b6c4313e8f40c42b96"
+checksum = "7cfb19caeb6a617e944dc40b7f8da7c44395b856efee62089e4cfff9be8126c1"
 dependencies = [
  "console_error_panic_hook",
  "serde",
@@ -1203,6 +1203,7 @@ dependencies = [
  "serde_json",
  "serde_qs",
  "sha2",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -1239,9 +1240,9 @@ dependencies = [
 
 [[package]]
 name = "fi-ethr-resolver"
-version = "0.0.7"
+version = "0.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62157683dc6ac9d8e97858fb4933379bf0b939db728759071c7b4d371f2ec32"
+checksum = "189a9212beaaef020a7f76585932aeea875b5695fd68092c72dde76840681b32"
 dependencies = [
  "base64 0.22.1",
  "bs58",
@@ -1257,9 +1258,9 @@ dependencies = [
 
 [[package]]
 name = "fi-key-resolver"
-version = "0.0.4"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a86e5ab78ede88df9892b85bdda304ad790780bd11f9b32e1694a5b353d1664d"
+checksum = "985077fde4ddfdb5fccc6caed81b2ce823efc0e1a5962166ee50a1ea486a3b83"
 dependencies = [
  "bs58",
  "curve25519-dalek",
@@ -3795,7 +3796,19 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "socket2",
+ "tokio-macros",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
 ]
 
 [[package]]

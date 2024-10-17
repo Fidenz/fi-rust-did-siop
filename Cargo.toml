@@ -8,10 +8,10 @@ async-trait = "0.1.83"
 base64-compat = "1.0.0"
 bs58 = "0.5.1"
 chrono = "0.4.38"
-fi-common = "0.1.1"
+fi-common = "0.1.4"
 fi-digital-signatures = "0.0.7"
-fi-ethr-resolver = "0.0.7"
-fi-key-resolver = "0.0.4" 
+fi-ethr-resolver = "0.0.9"
+fi-key-resolver = "0.0.6" 
 hex = "0.4.3"
 js-sys = "0.3.72"
 json_value_merge = "2.0.0"
@@ -34,3 +34,6 @@ wasm = ["fi-common/wasm"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[dev-dependencies]
+tokio = { version = "1.40.0", features = ["macros"] }

@@ -24,7 +24,7 @@ impl DidResolver for KeyResolver {
                 if did.is_some() {
                     return Ok(did.unwrap());
                 } else {
-                    return Err(Error::new("Did document couldn't be found"));
+                    return Err(Error::new("Did document couldn't be resolved"));
                 }
             }
             Err(error) => return Err(error),

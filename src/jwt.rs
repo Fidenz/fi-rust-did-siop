@@ -84,7 +84,7 @@ impl FromStr for JWT {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let content: Vec<&str> = s.split(".").collect();
         if content.len() < 2 {
-            return Err(Error::new("Invalid JWT content"));
+            return Err(Error::new("Invalid JWT string"));
         }
 
         let header: Header = match base64::decode(content[0]) {
@@ -129,9 +129,11 @@ impl JWT {
             ),
             signing_info.alg,
         ) {
-            Ok(_) => Ok(()),
-            Err(error) => Err(Error::new(error.to_string().as_str())),
+            Ok(val) => self.signature = Some(val),
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
         }
+
+        Ok(())
     }
 
     pub fn verify(
@@ -147,6 +149,26 @@ impl JWT {
         match verifying_key.verify(content, signature, signing_info.alg) {
             Ok(val) => Ok(val),
             Err(error) => Err(Error::new(error.to_string().as_str())),
+        }
+    }
+
+    pub fn to_string(&self) -> Result<String, Error> {
+        let token = format!(
+            "{}.{}",
+            base64::encode(&match serde_json::to_string(&self.header) {
+                Ok(val) => val,
+                Err(error) => return Err(Error::new(error.to_string().as_str())),
+            }),
+            base64::encode(&match serde_json::to_string(&self.payload) {
+                Ok(val) => val,
+                Err(error) => return Err(Error::new(error.to_string().as_str())),
+            })
+        );
+
+        if self.signature.is_some() {
+            return Ok(format!("{}.{}", token, self.signature.clone().unwrap()));
+        } else {
+            return Ok(token);
         }
     }
 }

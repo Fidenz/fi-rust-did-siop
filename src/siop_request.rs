@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     http_request::send_request,
     identity::{did::DidResolver, DidKey, Identity},
@@ -9,10 +11,21 @@ use fi_common::error::Error;
 use fi_digital_signatures::jwt::{Header, Payload};
 use json_value_merge::Merge;
 use reqwest::Method;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
 const REQUIRED_SCOPES: [&str; 1] = ["openid"];
+
+#[derive(Serialize, Deserialize)]
+struct Query {
+    response_type: Value,
+    client_id: Value,
+    redirect_uri: Option<Value>,
+    scope: Value,
+    request: Option<Value>,
+    request_uri: Option<Value>,
+}
 
 #[wasm_bindgen]
 pub struct DidSiopRequest {}
@@ -83,14 +96,19 @@ impl DidSiopRequest {
             });
             payload.merge(&options);
 
-            let jwt = JWT {
+            let mut jwt = JWT {
                 header,
                 payload: Payload(payload),
                 signature: None,
             };
 
-            query["request"] = match serde_json::to_value(jwt) {
-                Ok(val) => val,
+            match jwt.sign(signing_info) {
+                Ok(_) => {}
+                Err(error) => return Err(error),
+            }
+
+            query["request"] = match jwt.to_string() {
+                Ok(val) => json!(val.as_str()),
                 Err(error) => return Err(Error::new(error.to_string().as_str())),
             };
         }
@@ -115,17 +133,17 @@ impl DidSiopRequest {
 
         let obj_str = &request["openid://".len()..];
 
-        let query: Value = match serde_qs::from_str(obj_str) {
+        let query: Query = match serde_qs::from_str(obj_str) {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
         };
 
-        if query["client_id"].is_null() || query["response_type"].is_null() {
+        if query.client_id.is_null() || query.response_type.is_null() {
             return Err(Error::new("Invalid request"));
         }
 
-        let client_id_opt = query["client_id"].as_str();
-        let response_type_opt = query["response_type"].as_str();
+        let client_id_opt = query.client_id.as_str();
+        let response_type_opt = query.response_type.as_str();
 
         if client_id_opt.is_none() || response_type_opt.is_none() {
             return Err(Error::new("Invalid request"));
@@ -140,11 +158,10 @@ impl DidSiopRequest {
             ));
         }
 
-        let scope_opt = query["scope"].as_str();
+        let scope_opt = query.scope.as_str();
         if scope_opt.is_some() {
             let scope = scope_opt.unwrap();
             let requested_scopes: Vec<&str> = scope.split(" ").collect();
-
             if !requested_scopes.iter().all(|s| {
                 op_metadata
                     .scopes()
@@ -170,14 +187,13 @@ impl DidSiopRequest {
             return Err(Error::new("Invalid op_metadata fields: response_types"));
         }
 
-        let request_opt = query["request"].as_str();
-        if request_opt.is_none() {
-            let request_uri_opt = query["request_uri"].as_str();
-            if request_uri_opt.is_none() {
+        if query.request.is_none() {
+            if query.request_uri.is_none() {
                 return Err(Error::new("Invalid request fields: request_uri"));
             }
 
-            let request_uri = request_uri_opt.unwrap();
+            let req = query.request_uri.unwrap();
+            let request_uri = req.as_str().unwrap();
             if request_uri.contains(" ") {
                 return Err(Error::new("Invalid request uri"));
             }
@@ -187,11 +203,19 @@ impl DidSiopRequest {
                     Ok(val) => return Ok(val),
                     Err(error) => return Err(Error::new(error.to_string().as_str())),
                 },
-                Err(error) => return Err(Error::new(error.to_string().as_str())),
+                Err(error) => {
+                    return Err(Error::new(error.to_string().as_str()));
+                }
+            }
+        } else {
+            let rq = query.request.unwrap();
+            let request = rq.as_str();
+            if request.is_some_and(|f| !f.contains(" ")) {
+                Ok(String::from(request.unwrap()))
+            } else {
+                return Err(Error::new("Invalid request"));
             }
         }
-
-        todo!()
     }
 
     #[cfg(not(feature = "wasm"))]
@@ -205,7 +229,7 @@ impl DidSiopRequest {
         }
 
         let header: Header = match base64::decode(content[0]) {
-            Ok(val) => match serde_json::from_slice(val.as_slice()) {
+            Ok(val) => match serde_json::from_str(String::from_utf8(val).unwrap().as_str()) {
                 Ok(v) => v,
                 Err(error) => return Err(Error::new(error.to_string().as_str())),
             },
@@ -265,7 +289,6 @@ impl DidSiopRequest {
         // internal keys
 
         // validate jwt claims
-
         match JWT::verify(
             format!("{}.{}", content[0], content[1]),
             String::from(content[2]),

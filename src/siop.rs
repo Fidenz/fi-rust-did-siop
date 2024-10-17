@@ -150,11 +150,13 @@ pub fn get_metadata_supported() -> SiopMetadataSupported {
         authorization_endpoint: Some(String::from("openid")),
         issuer: Some(String::from("https://self-issued.me/v2")),
         response_types: Some(Vec::from([String::from("id_token")])),
-        scopes: Some(Vec::from([String::from("id_token")])),
-        subject_types: Some(Vec::from([String::from("id_token")])),
-        id_token_signing_alg_values: Some(Vec::from([String::from("id_token")])),
-        request_object_signing_alg_values: Some(Vec::from([String::from("id_token")])),
-        subject_syntax_types: Some(Vec::from([String::from("id_token")])),
-        id_token_types: Some(Vec::from([String::from("id_token")])),
+        scopes: Some(Vec::from([String::from("openid")])),
+        subject_types: Some(Vec::from([String::from("pairwise")])),
+        id_token_signing_alg_values: Some(Vec::from([String::from("ES256")])),
+        request_object_signing_alg_values: Some(Vec::from([String::from("ES256")])),
+        subject_syntax_types: Some(Vec::from([String::from(
+            "urn:ietf:params:oauth:jwk-thumbprint",
+        )])),
+        id_token_types: Some(Vec::from([String::from("subject_signed")])),
     }
 }

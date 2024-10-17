@@ -104,6 +104,7 @@ pub struct RP {
 impl RP {
     fn new(
         redirect_uri: String,
+        request_uri: Option<String>,
         did: String,
         registration: Value,
         did_doc: Option<DidDocument>,
@@ -115,7 +116,7 @@ impl RP {
                 did,
                 registration,
                 did_doc,
-                request_uri: None,
+                request_uri,
                 op_metadata,
             },
             identity: Identity::new(),
@@ -127,6 +128,7 @@ impl RP {
     #[cfg(not(feature = "wasm"))]
     pub async fn get_rp(
         redirect_uri: String,
+        request_uri: Option<String>,
         did: String,
         registration: Value,
         did_doc: Option<DidDocument>,
@@ -135,6 +137,7 @@ impl RP {
     ) -> RP {
         let mut rp = RP::new(
             redirect_uri,
+            request_uri,
             did.clone(),
             registration,
             did_doc.clone(),
@@ -155,18 +158,18 @@ impl RP {
     }
 
     #[cfg(not(feature = "wasm"))]
-    pub fn validate_response(
+    pub async fn validate_response(
         &self,
         response: String,
         check_params: &mut CheckParams,
         resolvers: Option<Vec<Box<dyn DidResolver>>>,
     ) -> Result<JWT, Error> {
         check_params.redirect_uri = self.info.redirect_uri.clone();
-        DidSiopResponse::validate_response(response, check_params.clone(), resolvers)
+        DidSiopResponse::validate_response(response, check_params.clone(), resolvers).await
     }
 
     #[cfg(not(feature = "wasm"))]
-    pub fn validate_response_with_vpdata(
+    pub async fn validate_response_with_vpdata(
         &self,
         tokens_encoded: SIOPTokensEcoded,
         check_params: &mut CheckParams,
@@ -178,6 +181,7 @@ impl RP {
             check_params.clone(),
             resolvers,
         )
+        .await
     }
 
     #[cfg(not(feature = "wasm"))]
@@ -209,6 +213,7 @@ impl RP {
     #[wasm_bindgen(method, js_name = "getRP")]
     pub fn get_rp(
         redirect_uri: String,
+        request_uri: Option<String>,
         did: String,
         registration: JsValue,
         did_doc: Option<DidDocument>,
@@ -216,6 +221,7 @@ impl RP {
     ) -> RP {
         let mut rp = RP::new(
             redirect_uri,
+            request_uri,
             did.clone(),
             match serde_wasm_bindgen::from_value(registration) {
                 Ok(val) => val,
@@ -265,17 +271,17 @@ impl RP {
             Err(error) => return Err(error),
         };
 
-        let key_content = match crate::key_extractors::get_verifying_key(key) {
+        let key_content = match crate::key_extractors::get_key(key) {
             Ok(val) => val,
             Err(error) => return Err(error),
         };
 
-        for key in keys.iter_mut() {
-            let alg = key.alg;
+        for _key in keys.iter_mut() {
+            let alg = _key.alg;
 
             let signing_info = SigningInfo {
                 alg,
-                kid: key.id.clone(),
+                kid: _key.id.clone(),
                 key: key_content.clone(),
             };
 
@@ -287,7 +293,7 @@ impl RP {
                 }
             };
 
-            let verifying_key = match get_verifying_key(key) {
+            let verifying_key = match get_verifying_key(_key) {
                 Ok(val) => val,
                 Err(error) => {
                     logger::error(error.to_string().as_str());
@@ -315,7 +321,7 @@ impl RP {
             if verified {
                 self.signing_info_set.push(signing_info);
 
-                return Ok(key.id.clone());
+                return Ok(_key.id.clone());
             }
         }
 
@@ -356,18 +362,19 @@ impl RP {
 
     #[cfg(feature = "wasm")]
     #[wasm_bindgen(method, js_name = "validateResponse")]
-    pub fn validate_response(
+    pub async fn validate_response(
         &self,
         response: String,
         check_params: &mut CheckParams,
     ) -> Result<JWT, Error> {
         check_params.redirect_uri = self.info.redirect_uri.clone();
         DidSiopResponse::validate_response(response, check_params.clone(), Some(get_resolvers()))
+            .await
     }
 
     #[cfg(feature = "wasm")]
     #[wasm_bindgen(method, js_name = "validateResponseWithVPData")]
-    pub fn validate_response_with_vpdata(
+    pub async fn validate_response_with_vpdata(
         &self,
         tokens_encoded: SIOPTokensEcoded,
         check_params: &mut CheckParams,
@@ -378,6 +385,7 @@ impl RP {
             check_params.clone(),
             Some(get_resolvers()),
         )
+        .await
     }
 }
 

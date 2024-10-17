@@ -1,10 +1,13 @@
 use crate::{
     identity::{did::DidResolver, Identity},
-    jwt::{get_signing_key, get_verifying_key, SigningInfo},
+    jwt::{get_signing_key, get_verifying_key, SigningInfo, JWT},
+    siop::SiopMetadataSupported,
+    siop_request::DidSiopRequest,
     siop_response::DidSiopResponse,
     vp::VPData,
 };
 use fi_common::{did::DidDocument, error::Error, keys::KeyPair, logger};
+use fi_digital_signatures::algorithms::Algorithm;
 use rand::Rng;
 use serde_json::Value;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -35,7 +38,7 @@ impl Provider {
     }
 
     #[cfg(not(feature = "wasm"))]
-    async fn set_user(
+    pub async fn set_user(
         &mut self,
         did: String,
         doc: Option<DidDocument>,
@@ -104,6 +107,15 @@ impl Provider {
             return Err(Error::new("No signing info instance found"));
         }
     }
+
+    pub async fn validate_request(
+        &self,
+        request: String,
+        op_metadata: Option<SiopMetadataSupported>,
+        resolvers: Option<Vec<Box<dyn DidResolver>>>,
+    ) -> Result<JWT, Error> {
+        DidSiopRequest::validate_request(request, op_metadata, resolvers).await
+    }
 }
 
 #[wasm_bindgen]
@@ -145,26 +157,29 @@ impl Provider {
     }
 
     #[wasm_bindgen(method, js_name = "addSigningParams")]
-    pub fn add_signing_params(&mut self, key: KeyPair) -> Result<String, Error> {
-        let mut keys = match self
-            .identity
-            .extract_authentication_keys(fi_digital_signatures::algorithms::Algorithm::EdDSA)
-        {
+    pub fn add_signing_params(
+        &mut self,
+        key: KeyPair,
+        alg: Option<Algorithm>,
+    ) -> Result<String, Error> {
+        let mut keys = match self.identity.extract_authentication_keys(match alg {
+            Some(val) => val,
+            None => fi_digital_signatures::algorithms::Algorithm::ES256K,
+        }) {
             Ok(val) => val.to_owned(),
             Err(error) => return Err(error),
         };
 
-        let key_content = match crate::key_extractors::get_verifying_key(key) {
+        let key_content = match crate::key_extractors::get_key(key) {
             Ok(val) => val,
             Err(error) => return Err(error),
         };
 
-        for key in keys.iter_mut() {
-            let alg = key.alg;
-
+        for _key in keys.iter_mut() {
+            let alg = _key.alg;
             let signing_info = SigningInfo {
                 alg,
-                kid: key.id.clone(),
+                kid: _key.id.clone(),
                 key: key_content.clone(),
             };
 
@@ -176,7 +191,7 @@ impl Provider {
                 }
             };
 
-            let verifying_key = match get_verifying_key(key) {
+            let verifying_key = match get_verifying_key(_key) {
                 Ok(val) => val,
                 Err(error) => {
                     logger::error(error.to_string().as_str());
@@ -203,8 +218,7 @@ impl Provider {
 
             if verified {
                 self.signing_info_set.push(signing_info);
-
-                return Ok(key.id.clone());
+                return Ok(_key.id.clone());
             }
         }
 

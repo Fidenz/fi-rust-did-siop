@@ -4,7 +4,7 @@ use keccak_hash::keccak256;
 use regex::Regex;
 use serde_json::Value;
 
-pub fn get_verifying_key(key_pair: KeyPair) -> Result<(Option<Vec<u8>>, Option<String>), Error> {
+pub fn get_key(key_pair: KeyPair) -> Result<(Option<Vec<u8>>, Option<String>), Error> {
     if key_pair.public_key_jwk.is_some() {
         let jwk = key_pair.public_key_jwk.unwrap();
 
@@ -13,9 +13,34 @@ pub fn get_verifying_key(key_pair: KeyPair) -> Result<(Option<Vec<u8>>, Option<S
             Err(error) => return Err(error),
         };
     }
+    if key_pair.private_key_jwk.is_some() {
+        let jwk = key_pair.private_key_jwk.unwrap();
+
+        match jwk_to_key_bytes(jwk.to_string()) {
+            Ok(val) => return Ok((Some(val), None)),
+            Err(error) => return Err(error),
+        };
+    }
 
     if key_pair.public_key_hex.is_some() {
-        let bytes = match hex::decode(key_pair.public_key_hex.unwrap()) {
+        let mut value = key_pair.public_key_hex.unwrap();
+        if value.starts_with("0x") {
+            value = String::from(&value[2..]);
+        }
+        let bytes = match hex::decode(value) {
+            Ok(val) => val,
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
+        };
+
+        return Ok((Some(bytes), None));
+    }
+
+    if key_pair.private_key_hex.is_some() {
+        let mut value = key_pair.private_key_hex.unwrap();
+        if value.starts_with("0x") {
+            value = String::from(&value[2..]);
+        }
+        let bytes = match hex::decode(value) {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
         };
@@ -31,9 +56,25 @@ pub fn get_verifying_key(key_pair: KeyPair) -> Result<(Option<Vec<u8>>, Option<S
 
         return Ok((Some(bytes), None));
     }
+    if key_pair.private_key_base58.is_some() {
+        let bytes = match bs58::decode(key_pair.private_key_base58.unwrap()).into_vec() {
+            Ok(val) => val,
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
+        };
+
+        return Ok((Some(bytes), None));
+    }
 
     if key_pair.public_key_base64.is_some() {
         let bytes = match base64::decode(&key_pair.public_key_base64.unwrap()) {
+            Ok(val) => val,
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
+        };
+
+        return Ok((Some(bytes), None));
+    }
+    if key_pair.private_key_base64.is_some() {
+        let bytes = match base64::decode(&key_pair.private_key_base64.unwrap()) {
             Ok(val) => val,
             Err(error) => return Err(Error::new(error.to_string().as_str())),
         };
@@ -49,9 +90,22 @@ pub fn get_verifying_key(key_pair: KeyPair) -> Result<(Option<Vec<u8>>, Option<S
 
         return Ok((Some(bytes), None));
     }
+    if key_pair.private_key_multibase.is_some() {
+        let bytes = match multibase::decode(key_pair.private_key_multibase.unwrap()) {
+            Ok((_, val)) => val,
+            Err(error) => return Err(Error::new(error.to_string().as_str())),
+        };
+
+        return Ok((Some(bytes), None));
+    }
 
     if key_pair.public_key_pem.is_some() {
         let pem = key_pair.public_key_pem.unwrap();
+
+        return Ok((None, Some(pem)));
+    }
+    if key_pair.private_key_pem.is_some() {
+        let pem = key_pair.private_key_pem.unwrap();
 
         return Ok((None, Some(pem)));
     }
@@ -79,7 +133,11 @@ pub fn get_verifying_key(key_pair: KeyPair) -> Result<(Option<Vec<u8>>, Option<S
         }
     }
 
-    return Err(Error::new("Public key data couldn't be found"));
+    if key_pair.value.is_some() {
+        return Ok((Some(key_pair.value.unwrap().as_bytes().to_vec()), None));
+    }
+
+    return Err(Error::new("Private key data couldn't be found"));
 }
 
 fn jwk_to_key_bytes(jwk_str: String) -> Result<Vec<u8>, Error> {
