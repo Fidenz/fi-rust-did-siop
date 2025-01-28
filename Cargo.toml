@@ -1,0 +1,39 @@
+[package]
+name = "fi-did-siop"
+version = "0.1.0"
+edition = "2021" 
+
+[dependencies]
+async-trait = "0.1.83"
+base64-compat = "1.0.0"
+bs58 = "0.5.1"
+chrono = "0.4.38"
+fi-common = "0.1.4"
+fi-digital-signatures = "0.0.7"
+fi-ethr-resolver = "0.0.9"
+fi-key-resolver = "0.0.6" 
+hex = "0.4.3"
+js-sys = "0.3.72"
+json_value_merge = "2.0.0"
+keccak-hash = "0.11.0"
+multibase = "0.9.1"
+rand = "0.8.5"
+regex = "1.11.0"
+reqwest = "0.12.8"
+secp256k1 = "0.29.1"
+serde = { version = "1.0.210", features = ["derive"] }
+serde-wasm-bindgen = "0.6.5"
+serde_json = "1.0.128"
+serde_qs = "0.13.0"  
+sha2 = "0.10.8"
+wasm-bindgen = "0.2.94"
+wasm-bindgen-futures = "0.4.45"
+
+[features]
+wasm = ["fi-common/wasm"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dev-dependencies]
+tokio = { version = "1.40.0", features = ["macros"] }
